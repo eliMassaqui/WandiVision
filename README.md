@@ -4,6 +4,9 @@ O **Wandi Vision** é o sistema de percepção e controle gestual do **Wandi Rob
 Ele interpreta gestos bimanuias em tempo real e converte esses gestos em comandos digitais discretos, enviados via comunicação serial diretamente ao robô.
 ---
 
+![OPENCV](https://github.com/eliMassaqui/WandiVision/blob/master/Captura%20de%20ecr%C3%A3%202026-02-05%20131834.png)
+
+
 ## 🧠 Arquitetura do Sistema
 
 ### Camada de Percepção
