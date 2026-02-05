@@ -8,7 +8,7 @@ import math
 
 # --- CONFIGURAÇÃO SERIAL ---
 try:
-    arduino = serial.Serial('COM5', 9600, timeout=0.1)
+    arduino = serial.Serial('COM5', 115200, timeout=0.01)
     time.sleep(2)
 except:
     arduino = None
@@ -196,10 +196,11 @@ while cap.isOpened():
 
     # --- ARDUINO ---
     valor_serial = 0
-    if cmd_together: valor_serial = 4
-    elif cmd_quad:   valor_serial = 3
-    elif cmd_triple: valor_serial = 2
+    if cmd_together: valor_serial = 2
+    elif cmd_quad:   valor_serial = 4
+    elif cmd_triple: valor_serial = 3
     elif cmd_duo:    valor_serial = 1
+    else:            valor_serial = 0
     
     if arduino:
         try: arduino.write(str(valor_serial).encode())
