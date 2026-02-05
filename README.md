@@ -28,12 +28,12 @@ Ele interpreta gestos bimanuias em tempo real e converte esses gestos em comando
 
 ## 🔗 Protocolo de Comunicação (Serial)
 
-| Byte | Estado   | Ação no Wandi Robot         |
-| ---- | -------- | --------------------------- |
-| '1'  | Duo      | Inicialização / modo básico |
-| '2'  | Together | Sincronização de atuadores  |
-| '3'  | Triple   | Operação lógica             |
-| '4'  | Quad     | Ativação total              |
+| Byte | Estado   | Ação no Wandi Robot |
+| ---- | -------- | ------------------- |
+| '1'  | Duo      | ... |
+| '2'  | Together | ... |
+| '3'  | Triple   | ... |
+| '4'  | Quad     | ... |
 
 📌 Os estados são **mutuamente exclusivos**.
 
