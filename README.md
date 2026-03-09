@@ -49,8 +49,7 @@ O **Wandi Vision** é um módulo do ecossistema **Wandi Studio** que permite **c
 ### 1. Criar e ativar ambiente Conda
 
 ```bash
-conda create -n wandi_vision python=3.10
-conda activate wandi_vision
+conda create -n gestos python=3.10
 ```
 
 ### 2. Instalar dependências
@@ -62,7 +61,8 @@ pip install opencv-python mediapipe pyserial numpy
 ### 3. Executar o módulo
 
 ```bash
-python wandi_vision.py
+conda activate gestos
+python gestos.py
 ```
 
 > Obs: Execução fora do ambiente configurado **não é garantida**.
