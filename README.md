@@ -1,198 +1,126 @@
-# 📘 Wandi Vision — Physical Robot Control
+# 📘 Wandi Vision — Controle Analógico de Servo
 
-O **Wandi Vision** é o sistema de percepção e controle gestual do **Wandi Robot**.
-Ele interpreta gestos bimanuias em tempo real e converte esses gestos em comandos digitais discretos, enviados via comunicação serial diretamente ao robô.
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Conda](https://img.shields.io/badge/Conda-Active-brightgreen)](https://docs.conda.io/)
+
+O **Wandi Vision** é um módulo do ecossistema **Wandi Studio** que permite **controlar servos motores a partir de gestos da mão**. Ele interpreta a distância entre o polegar e o dedo indicador em tempo real e converte esse gesto em um ângulo analógico (0° a 180°), enviado via comunicação serial para o microcontrolador.
+
 ---
 
-![OPENCV](https://github.com/eliMassaqui/WandiVision/blob/master/Captura%20de%20ecr%C3%A3%202026-02-05%20131834.png)
+![Wandi Vision Screenshot](https://github.com/eliMassaqui/WandiVision/blob/master/Captura%20de%20ecr%C3%A3%202026-03-09%20132352.png)
 
+---
 
 ## 🧠 Arquitetura do Sistema
 
 ### Camada de Percepção
 
-* MediaPipe Hands
-* Rastreamento simultâneo das duas mãos
-* Extração de estados lógicos dos dedos
+* **MediaPipe Hands** — Rastreamento de 1 mão
+* Extração da distância entre polegar e indicador
+* Normalização da distância para range de 0° a 180°
 
 ### Camada de Decisão
 
-* Combinação bimanual de gestos
-* Máquina de estados discreta
-* Apenas um comando ativo por vez
+* Interpolação linear da distância para ângulo do servo
+* Filtragem de jitter (envio apenas se a diferença > 1°)
+* Interface visual em tempo real para monitoramento do ângulo
 
 ### Camada de Execução
 
-* Comunicação Serial @ **115200 bps**
-* Protocolo enxuto (**1 byte**)
-* Controle direto das saídas digitais do robô
+* Comunicação serial @ **115200 bps**
+* Envio contínuo de valores inteiros do ângulo (0–180)
+* Controle direto do servo motor via Arduino
 
 ---
 
 ## 🔗 Protocolo de Comunicação (Serial)
 
-| Byte | Estado   | Ação no Wandi Robot |
-| ---- | -------- | ------------------- |
-| '1'  | Duo      | ... |
-| '2'  | Together | ... |
-| '3'  | Triple   | ... |
-| '4'  | Quad     | ... |
+| Tipo de dado | Conteúdo | Ação no Arduino       |
+| ------------ | -------- | --------------------- |
+| Inteiro      | 0 a 180  | Ângulo do servo motor |
 
-📌 Os estados são **mutuamente exclusivos**.
+📌 O valor enviado é **inteiro** e representa diretamente a posição do servo.
 
 ---
 
-## ⚙️ Execução (Obrigatória via Conda)
+## ⚙️ Instalação e Execução
 
-O sistema **só pode ser executado** dentro do ambiente Conda configurado:
+### 1. Criar e ativar ambiente Conda
 
 ```bash
-conda activate gestos
-python gestos.py
+conda create -n wandi_vision python=3.10
+conda activate wandi_vision
 ```
 
-Execução fora desse ambiente **não é suportada**.
+### 2. Instalar dependências
+
+```bash
+pip install opencv-python mediapipe pyserial numpy
+```
+
+### 3. Executar o módulo
+
+```bash
+python wandi_vision.py
+```
+
+> Obs: Execução fora do ambiente configurado **não é garantida**.
 
 ---
 
-## 🧩 Trechos Essenciais — `gestos.py`
+## 🧩 Trechos Essenciais — `wandi_vision.py`
 
-### Comunicação com o Wandi Robot
+### Comunicação Serial com Arduino
 
 ```python
 BAUD_RATE = 115200
 porta_serial = 'COM5'
-
 arduino = serial.Serial(porta_serial, BAUD_RATE, timeout=0.01)
 ```
 
-Estabelece o canal direto de controle entre o módulo de visão e o robô físico.
-
----
-
-### Extração de Estados dos Dedos
+### Cálculo do Ângulo a partir da Distância
 
 ```python
-def get_finger_state(hand, lado):
-    dedos = [False]*5
-    if lado == "Right":
-        dedos[0] = hand.landmark[4].x < hand.landmark[3].x
-    else:
-        dedos[0] = hand.landmark[4].x > hand.landmark[3].x
-    return dedos
+dist_normalizada = math.hypot(thumb_tip.x - index_tip.x,
+                              thumb_tip.y - index_tip.y,
+                              thumb_tip.z - index_tip.z)
+angulo_raw = np.interp(dist_normalizada, [DIST_MIN_VISUAL, DIST_MAX_VISUAL], [0, 180])
+angulo_atual = int(np.clip(angulo_raw, 0, 180))
 ```
 
-Converte geometria da mão em estados lógicos binários.
-
----
-
-### Lógica de Decisão (Estados do Robô)
+### Envio Seguro do Ângulo
 
 ```python
-if esq_ap and dir_ap:
-    cmd_atual = 1
-elif esq_2d and dir_2d:
-    cmd_atual = 4
+if arduino and abs(angulo_atual - ultimo_angulo_enviado) > 1:
+    arduino.write(f"{angulo_atual}\n".encode())
+    ultimo_angulo_enviado = angulo_atual
 ```
-
-Cada combinação de gestos gera **um único estado operacional** do Wandi Robot.
 
 ---
 
-### Envio Seguro do Comando
-
-```python
-if cmd_atual != ultimo_cmd:
-    arduino.write(str(cmd_atual).encode())
-    ultimo_cmd = cmd_atual
-```
-
-Evita flood serial e garante transições de estado controladas.
-
----
-
-## 🔌 Firmware do Wandi Robot — Código Arduino Completo
+## 🔌 Firmware Arduino — Controle do Servo
 
 ```cpp
-/*
- Wandi Vision - Execution Layer (Wandi Robot)
+#include <Servo.h>
 
- Responsabilidades:
- - Receber comandos via Serial
- - Garantir exclusividade das saídas digitais
- - Operar em modo fail-safe
- - Controlar diretamente o hardware do Wandi Robot
-
- Protocolo:
- - 1 byte por comando ('1' a '4')
- - Baud rate: 115200
-*/
-
-// Definição dos pinos de controle do robô
-const int PIN_DUO      = 9;   // Comando 1
-const int PIN_TOGETHER = 10;  // Comando 2
-const int PIN_TRIPLE   = 11;  // Comando 3
-const int PIN_QUAD     = 12;  // Comando 4
+Servo meuServo;
+const int pinoServo = 6;
 
 void setup() {
-
-  // Inicializa comunicação serial
   Serial.begin(115200);
-
-  // Configura pinos como saída
-  pinMode(PIN_DUO, OUTPUT);
-  pinMode(PIN_TOGETHER, OUTPUT);
-  pinMode(PIN_TRIPLE, OUTPUT);
-  pinMode(PIN_QUAD, OUTPUT);
-
-  // Estado inicial seguro
-  resetPins();
+  meuServo.attach(pinoServo);
+  meuServo.write(90); // Posição inicial
+  Serial.println("WandiVision Analogo Iniciado");
 }
 
 void loop() {
-
-  // Aguarda comando vindo do Wandi Vision
   if (Serial.available() > 0) {
-
-    char comando = Serial.read();
-
-    // Garante exclusividade:
-    // sempre limpa todos os estados antes de ativar um novo
-    resetPins();
-
-    switch (comando) {
-
-      case '1':
-        digitalWrite(PIN_DUO, HIGH);
-        break;
-
-      case '2':
-        digitalWrite(PIN_TOGETHER, HIGH);
-        break;
-
-      case '3':
-        digitalWrite(PIN_TRIPLE, HIGH);
-        break;
-
-      case '4':
-        digitalWrite(PIN_QUAD, HIGH);
-        break;
-
-      default:
-        // Qualquer valor inesperado mantém o robô em estado seguro
-        resetPins();
-        break;
+    int angulo = Serial.parseInt();
+    if (angulo >= 0 && angulo <= 180) {
+      meuServo.write(angulo);
     }
   }
-}
-
-// Função de segurança: desativa todas as saídas
-void resetPins() {
-
-  digitalWrite(PIN_DUO, LOW);
-  digitalWrite(PIN_TOGETHER, LOW);
-  digitalWrite(PIN_TRIPLE, LOW);
-  digitalWrite(PIN_QUAD, LOW);
 }
 ```
 
@@ -200,15 +128,28 @@ void resetPins() {
 
 ## 🔐 Segurança Operacional
 
-* Nenhum comando contínuo
-* Nenhum estado ambíguo
-* Reset automático a cada novo comando
-* Fail-safe por padrão no robô físico
+* Filtragem de ângulo mínimo para evitar jitter
+* Reset automático de posição inicial no boot
+* Comunicação serial robusta para falhas de leitura
+* Garantia de operação dentro do range do servo (0°–180°)
 
 ---
 
 ## 📌 Status
 
-✔ Controle gestual do Wandi Robot físico
-✔ Comunicação serial estável
-✔ Arquitetura extensível
+✔ Controle gestual do servo motor funcionando
+✔ Comunicação serial confiável
+✔ Interface visual em tempo real
+✔ Arquitetura modular, extensível para outros módulos do Wandi Studio
+
+---
+
+## 🔗 Links e Referências
+
+* [MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands)
+* [OpenCV](https://opencv.org/)
+* [PySerial](https://pyserial.readthedocs.io/)
+
+---
+
+**Licença:** MIT
