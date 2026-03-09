@@ -1,57 +1,36 @@
-/* Robotgames - Wandi Vision 
-   Controle Estrito de Saídas Digitais
-*/
+#include <Servo.h>
 
-// Definição dos pinos atualizada
-const int PIN_DUO      = 9;  // Comando 1
-const int PIN_TOGETHER = 10; // Comando 2
-const int PIN_TRIPLE   = 11; // Comando 3
-const int PIN_QUAD     = 12; // Comando 4
+Servo meuServo;
+const int pinoServo = 6; // Pino de sinal do servo
 
 void setup() {
-  Serial.begin(9600);
-
-  pinMode(PIN_DUO, OUTPUT);
-  pinMode(PIN_TOGETHER, OUTPUT);
-  pinMode(PIN_TRIPLE, OUTPUT);
-  pinMode(PIN_QUAD, OUTPUT);
-
-  // Inicializa tudo em nível baixo (OFF)
-  resetPins();
+  // Inicializa serial na mesma velocidade definida no Python
+  Serial.begin(115200);
+  
+  meuServo.attach(pinoServo);
+  
+  // Inicializa o servo no meio (90 graus)
+  meuServo.write(90);
+  
+  // Imprime uma mensagem para confirmar o boot (aparece no terminal do Python se ler)
+  Serial.println("WandiVision Analogo Iniciado");
 }
 
 void loop() {
+  // Verifica se há dados chegando na porta serial
   if (Serial.available() > 0) {
-    char comando = Serial.read();
-
-    // Limpa estados anteriores para garantir exclusividade
-    resetPins();
-
-    // Aciona o pino conforme a nova ordem:
-    switch (comando) {
-      case '1':
-        digitalWrite(PIN_DUO, HIGH);
-        break;
-      case '2':
-        digitalWrite(PIN_TOGETHER, HIGH);
-        break;
-      case '3':
-        digitalWrite(PIN_TRIPLE, HIGH);
-        break;
-      case '4':
-        digitalWrite(PIN_QUAD, HIGH);
-        break;
-      default:
-        // Caso receba '0' ou qualquer outro caractere, mantém tudo OFF
-        resetPins();
-        break;
+    
+    // Lê o próximo número inteiro válido que chega pela serial.
+    // O Python está enviando "VALOR\n". O parseInt sabe ler isso.
+    int angulo = Serial.parseInt();
+    
+    // Se recebeu um ângulo válido ( parseInt retorna 0 se não encontrar número, 
+    // mas 0 é um ângulo válido, então confiamos na lógica do Python)
+    
+    // Pequena validação de segurança para garantir o range do servo
+    if (angulo >= 0 && angulo <= 180) {
+      // Move o servo para o ângulo recebido da mão
+      meuServo.write(angulo);
     }
   }
-}
-
-void resetPins() {
-  digitalWrite(PIN_DUO, LOW);
-  digitalWrite(PIN_TOGETHER, LOW);
-  digitalWrite(PIN_TRIPLE, LOW);
-  digitalWrite(PIN_QUAD, LOW);
 }
